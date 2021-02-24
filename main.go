@@ -35,7 +35,6 @@ type Dialog struct {
 }
 
 type Metadata struct {
-	Raw   string       `json:"_raw"`
 	Type  MetadataType `json:"type"`
 	Value string       `json:"value"`
 }
@@ -187,14 +186,12 @@ func ParseMeta(pageTitle *colly.HTMLElement, firstParagraph *colly.HTMLElement) 
 	publication, series := parsePublication(publication)
 	if publication != "" {
 		meta = append(meta, Metadata{
-			Raw:   publication,
 			Type:  MetadataTypePublication,
 			Value: publication,
 		})
 	}
 	if series != "" {
 		meta = append(meta, Metadata{
-			Raw:   publication,
 			Type:  MetadataTypeSeries,
 			Value: series,
 		})
