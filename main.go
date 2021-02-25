@@ -1,10 +1,10 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"github.com/gocolly/colly/v2"
+	"github.com/warmans/pilkipedia-scraper/pkg/models"
 	"log"
 	"os"
 	"regexp"
@@ -12,62 +12,6 @@ import (
 	"time"
 )
 
-type DialogType string
-
-const (
-	DialogTypeUnkown = DialogType("unknown")
-	DialogTypeSong   = DialogType("song")
-	DialogTypeChat   = DialogType("chat")
-)
-
-type MetadataType string
-
-const (
-	MetadataTypePublication = MetadataType("publication")
-	MetadataTypeSeries      = MetadataType("series")
-	MetadataTypeDate        = MetadataType("date")
-)
-
-type Dialog struct {
-	Type    DialogType `json:"type"`
-	Actor   string     `json:"actor"`
-	Content string     `json:"content"`
-}
-
-type Metadata struct {
-	Type  MetadataType `json:"type"`
-	Value string       `json:"value"`
-}
-
-type Episode struct {
-	Source     string     `json:"source"`
-	Meta       []Metadata `json:"metadata"`
-	Transcript []Dialog   `json:"transcript"`
-}
-
-func (e Episode) metaValue(t MetadataType) string {
-	for _, m := range e.Meta {
-		if m.Type == t {
-			return m.Value
-		}
-	}
-	return "na"
-}
-
-func (e Episode) CanonicalName() string {
-	date := "na"
-	if rawDate := e.metaValue(MetadataTypeDate); rawDate != "" {
-		t, err := time.Parse(time.RFC3339, rawDate)
-		if err == nil {
-			date = t.Format("Jan-01-2006")
-		}
-	}
-
-	//avoid overwriting na files
-	unique := fmt.Sprintf("%x", sha256.Sum256([]byte(e.Source)))
-
-	return fmt.Sprintf("%s-%s-%s-%s", e.metaValue(MetadataTypePublication), e.metaValue(MetadataTypeSeries), date, unique[0:6])
-}
 
 func main() {
 
@@ -91,9 +35,9 @@ func main() {
 	// per page scraper
 	episodeDetailsCollector.OnHTML("div[id=content]", func(e *colly.HTMLElement) {
 
-		episode := Episode{
-			Transcript: []Dialog{},
-			Meta:       []Metadata{},
+		episode := models.Episode{
+			Transcript: []models.Dialog{},
+			Meta:       []models.Metadata{},
 		}
 
 		fmt.Println("Loaded page ", e.Request.URL)
@@ -152,13 +96,13 @@ func main() {
 }
 
 // e.g. This is a transcription of the 15 November 2003 episode, from Xfm Series 3
-func ParseMeta(pageTitle *colly.HTMLElement, firstParagraph *colly.HTMLElement) ([]Metadata, error) {
+func ParseMeta(pageTitle *colly.HTMLElement, firstParagraph *colly.HTMLElement) ([]models.Metadata, error) {
 
 	if pageTitle == nil && firstParagraph == nil {
 		return nil, nil
 	}
 
-	meta := []Metadata{}
+	meta := []models.Metadata{}
 
 	date, publication := getRawMetaParts(firstParagraph)
 	if date == "" && pageTitle != nil {
@@ -169,8 +113,8 @@ func ParseMeta(pageTitle *colly.HTMLElement, firstParagraph *colly.HTMLElement) 
 		return nil, fmt.Errorf("couldn't parse meta from line: %s", firstParagraph.Text)
 	}
 
-	dateMeta := Metadata{
-		Type:  MetadataTypeDate,
+	dateMeta :=models. Metadata{
+		Type:  models.MetadataTypeDate,
 		Value: "",
 	}
 
@@ -185,14 +129,14 @@ func ParseMeta(pageTitle *colly.HTMLElement, firstParagraph *colly.HTMLElement) 
 	// Xfm Series 3
 	publication, series := parsePublication(publication)
 	if publication != "" {
-		meta = append(meta, Metadata{
-			Type:  MetadataTypePublication,
+		meta = append(meta, models.Metadata{
+			Type:  models.MetadataTypePublication,
 			Value: publication,
 		})
 	}
 	if series != "" {
-		meta = append(meta, Metadata{
-			Type:  MetadataTypeSeries,
+		meta = append(meta, models.Metadata{
+			Type:  models.MetadataTypeSeries,
 			Value: series,
 		})
 	}
@@ -233,20 +177,20 @@ func parsePublication(line string) (string, string) {
 	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
 }
 
-func ParseDialog(el *colly.HTMLElement) (*Dialog, error) {
+func ParseDialog(el *colly.HTMLElement) (*models.Dialog, error) {
 
 	content, contentPrefix := cleanContent(el)
 
-	dialog := &Dialog{
+	dialog := &models.Dialog{
 		Actor:   strings.ToLower(strings.TrimSuffix(strings.TrimSpace(el.ChildText("span")), ":")),
-		Type:    DialogTypeUnkown,
+		Type:    models.DialogTypeUnkown,
 		Content: content,
 	}
 	if contentPrefix == "song" {
-		dialog.Type = DialogTypeSong
+		dialog.Type = models.DialogTypeSong
 	} else {
 		if dialog.Actor != "" {
-			dialog.Type = DialogTypeChat
+			dialog.Type = models.DialogTypeChat
 		}
 	}
 
